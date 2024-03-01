@@ -106,8 +106,8 @@ def getFilesToMove(directory):
 
   files = os.listdir(directory)
   totalSize = 0
-  #currDate = datetime.today()
-  currDate = datetime(2024, 2, 26) #Temporaria
+  currDate = datetime.today()
+  #currDate = datetime(2024, 2, 26) #Temporaria
   fileInfoList = []
 
   for file in files:
@@ -153,8 +153,8 @@ def transferFiles(files, fromPath, toPath, buffer):
 
   try:
 
-    #currDate = datetime.now()
-    currDate = datetime(2024, 2, 26) #simulando que hoje é segunda
+    currDate = datetime.now()
+    #currDate = datetime(2024, 2, 26) #simulando que hoje é segunda
     yearDirectoryPath = os.path.join(toPath, str(currDate.year))
     newMouthDirectoryPath = os.path.join(yearDirectoryPath, mouths[currDate.month - 1])
     oldMouthDirectoryPath = os.path.join(yearDirectoryPath, mouths[currDate.month - 2])
@@ -197,8 +197,8 @@ def boot(fromPath, toPath, buffer):
 
   #EXECUTA O BACKUP APENAS NAS SEGUNDAS
   currDate = date.today()
-  #if(currDate.weekday() != 0):
-   # return
+  if(currDate.weekday() != 0):
+    return
 
   try:
       
