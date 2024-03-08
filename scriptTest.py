@@ -217,7 +217,7 @@ with open('teste_script_backup.log', 'w') as log_file:
   log_file.write('')
 
 logging.info(f"Caminhos\nfrompath: {os.getenv("FROMPATH")}\ntopath: {os.getenv("TOPATH")}\nbuffer: {os.getenv("BUFFER")}\n")
-logging.info(f"Credenciais\nfrom_email: {os.getenv("FROM_EMAIL")}\nto_email: {os.getenv("TO_EMAIL")}\npassword_email: {os.getenv("PASSWORD_EMAIL")}\n")
+logging.info(f"Credenciais\nfrom_email: {os.getenv("FROM_EMAIL")}\nto_email: {os.getenv("TO_EMAIL")}\n")
 
 createTestDirectory()
 
