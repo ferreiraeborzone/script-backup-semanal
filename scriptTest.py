@@ -1,14 +1,52 @@
 import os
-from datetime import datetime, date
-from shutil import disk_usage, move, copy2
+from datetime import datetime, date, timedelta
+from shutil import disk_usage, move, copy2, rmtree
 import smtplib
 from email.message import EmailMessage
 import logging
-import json
-from sys import argv
+from dotenv import load_dotenv
 
-logging.basicConfig(filename='backup.log', level=logging.ERROR)
+logging.basicConfig(filename='teste_script_backup.log', level=logging.INFO)
 
+load_dotenv()
+
+def createTestDirectory():
+  
+  # Criar as pastas 'origem', 'destino' e 'buffer' se não existirem
+  pastas = ['origem', 'destino', 'buffer']
+  for pasta in pastas:
+    if os.path.exists(pasta):
+      rmtree(pasta)
+    os.makedirs(pasta)
+      
+
+  # Define a data inicial e final
+  data_inicio = datetime(2024, 2, 18)
+  data_final = datetime(2024, 2, 26)
+
+  # Loop sobre cada dia no período
+  delta_dias = timedelta(days=1)
+  data_atual = data_inicio
+
+  while data_atual <= data_final:
+    
+    # Loop para gerar 5 arquivos para cada dia
+    for i in range(1, 8):
+      # Criar o nome do arquivo com o formato desejado
+      nome_arquivo = f"arquivo_{data_atual.strftime('%Y%m%d')}_{i}.txt"
+      caminho_arquivo = os.path.join('origem', nome_arquivo)
+      
+      # Criar o arquivo na pasta 'origem'
+      with open(caminho_arquivo, 'w') as arquivo:
+        arquivo.write(f"Este é o arquivo {nome_arquivo}")
+      
+      # Definir a data de modificação do arquivo
+      data_modificacao = data_atual.timestamp()
+      os.utime(caminho_arquivo, times=(data_modificacao, data_modificacao))
+    
+    # Avançar para o próximo dia
+    data_atual += delta_dias
+    
 def convertBytesTo(bytes):
 
   kb = bytes / 1024
@@ -27,69 +65,6 @@ def convertBytesTo(bytes):
   else:
     return f"{bytes} bytes"
 
-def emailMessage(data):
-
-  message = ''
-
-  if(data['status_type'] == 'error_path'):
-    message = f"Não foi possivel realizar o backup.\n{data['error_message']}"
-  
-  else:
-  
-    if(data['status_type'] == 'error_file'):
-      message = f"Houve um problema durante a transição de arquivos\n{data['error_message']}"
-
-    elif(data['status_type']  == 'success'):
-      message = f"Sucesso na transferência de arquivos."
-
-    else:
-      message = f"Houve um problema durante a transição de arquivos\n{data['error_message']}"
-      return message
-
-    generalDate = None
-    
-    #Mensagem com os dados da transferência de arquivos
-    message += f"\n\nInformações sobre a transferência de arquivos:\n"
-    message += f"Total de arquivos para transferência: {data['total_files']}\n"
-    message += f"Total de arquivos transferidos: {len(data['moved_files'])}\n"
-    message += f"Custo total de armazenamento: {convertBytesTo(data['total_size'])}\n\nArquivos Transferidos:\n"
-
-    #Listando todos os arquivos movidos
-    for file in data['moved_files']:
-
-      if(generalDate != file['date'].date()):
-        message += f"\n({file['date'].strftime('%d/%m/%Y')})\n"
-        generalDate = file['date'].date()
-
-      message += f"{file['name']} ({convertBytesTo(file['size'])})\n"
-    
-  return message
-
-def sendEmail(movedFiles):
-
-  try:
-
-    body = emailMessage(movedFiles)
-
-    #Abrindo o json para pegar as credenciais do email
-    with open("credentials.examples.json") as f:
-      credentials = json.load(f)
-
-    #Montando o email
-    msg = EmailMessage()
-    msg['Subject'] = f"Backup Semanal ({datetime.now().strftime('%d/%m/%Y')})"
-    msg['From'] = credentials['gmailUser']
-    msg['To'] = credentials['gmailReceiver']
-    msg.set_content(body)
-
-    #Enviando o email
-    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-      smtp.login(credentials['gmailUser'], credentials['gmailPassword'])
-      smtp.send_message(msg)
-
-  except Exception as e:
-    logging.error(e, datetime.now())
-
 def getStorageInfo(directory):
 
   storage = disk_usage(directory)
@@ -106,13 +81,13 @@ def getFilesToMove(directory):
 
   files = os.listdir(directory)
   totalSize = 0
-  currDate = datetime.today()
-  #currDate = datetime(2024, 2, 26) #Temporaria
+  #currDate = datetime.today()
+  currDate = datetime(2024, 2, 26) #Temporaria
   fileInfoList = []
 
   for file in files:
 
-    if(file.endswith('sql')):
+    if(file.endswith('txt')):
 
       filePath = os.path.join(directory, file)
       fileDate = datetime.fromtimestamp(os.stat(filePath).st_mtime)
@@ -153,8 +128,8 @@ def transferFiles(files, fromPath, toPath, buffer):
 
   try:
 
-    currDate = datetime.now()
-    #currDate = datetime(2024, 2, 26) #simulando que hoje é segunda
+    #currDate = datetime.now()
+    currDate = datetime(2024, 2, 26) #simulando que hoje é segunda
     yearDirectoryPath = os.path.join(toPath, str(currDate.year))
     newMouthDirectoryPath = os.path.join(yearDirectoryPath, mouths[currDate.month - 1])
     oldMouthDirectoryPath = os.path.join(yearDirectoryPath, mouths[currDate.month - 2])
@@ -191,14 +166,25 @@ def transferFiles(files, fromPath, toPath, buffer):
     logging.error(f"{e} ({currDate})")
   
   finally:
-    sendEmail(response)
-
+    response_log = ''
+    
+    logging.info(f"Informacoes sobre a transferencia\nArquivos Movidos: {len(response['moved_files'])}\nTotal de arquivos: {response['total_files']}\nCusto de armazenamento: {convertBytesTo(response['total_size'])}\n")
+    
+    for data in response['moved_files']:
+      response_log += f"{data['name']} | {data['date']} | {convertBytesTo(data['size'])}\n"
+      
+    logging.info(f"\n{response_log}")
+    
+    rmtree("buffer")
+    rmtree("destino")
+    rmtree("origem")
+    
 def boot(fromPath, toPath, buffer):
 
   #EXECUTA O BACKUP APENAS NAS SEGUNDAS
   currDate = date.today()
-  if(currDate.weekday() != 0):
-    return
+  #if(currDate.weekday() != 0):
+    #return
 
   try:
       
@@ -225,8 +211,15 @@ def boot(fromPath, toPath, buffer):
     transferFiles(filesToMove['files'], fromPath, toPath, buffer)
 
   except Exception as e:
-    logging.error(f"{e} ({currDate})")
-    sendEmail({'status_type': 'error_path', 'error_message': e})
+    logging.error(e)
+
+with open('teste_script_backup.log', 'w') as log_file:
+  log_file.write('')
+
+logging.info(f"Caminhos\nfrompath: {os.getenv("FROMPATH")}\ntopath: {os.getenv("TOPATH")}\nbuffer: {os.getenv("BUFFER")}\n")
+logging.info(f"Credenciais\nfrom_email: {os.getenv("FROM_EMAIL")}\nto_email: {os.getenv("TO_EMAIL")}\npassword_email: {os.getenv("PASSWORD_EMAIL")}\n")
+
+createTestDirectory()
 
 
-boot(argv[1], argv[2], argv[3])
+boot(os.getenv("FROMPATH"), os.getenv("TOPATH"), os.getenv("BUFFER"))
