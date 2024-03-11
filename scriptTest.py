@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, date, timedelta
-from shutil import disk_usage, move, copy2, rmtree
+from shutil import disk_usage, move, copy2
 import smtplib
 from email.message import EmailMessage
 import logging
@@ -11,15 +11,7 @@ logging.basicConfig(filename='teste_script_backup.log', level=logging.INFO)
 load_dotenv()
 
 def createTestDirectory():
-  
-  # Criar as pastas 'origem', 'destino' e 'buffer' se não existirem
-  pastas = ['origem', 'destino', 'buffer']
-  for pasta in pastas:
-    if os.path.exists(pasta):
-      rmtree(pasta)
-    os.makedirs(pasta)
       
-
   # Define a data inicial e final
   data_inicio = datetime(2024, 2, 18)
   data_final = datetime(2024, 2, 26)
@@ -29,24 +21,24 @@ def createTestDirectory():
   data_atual = data_inicio
 
   while data_atual <= data_final:
-    
-    # Loop para gerar 5 arquivos para cada dia
-    for i in range(1, 8):
-      # Criar o nome do arquivo com o formato desejado
-      nome_arquivo = f"arquivo_{data_atual.strftime('%Y%m%d')}_{i}.txt"
-      caminho_arquivo = os.path.join('origem', nome_arquivo)
       
-      # Criar o arquivo na pasta 'origem'
-      with open(caminho_arquivo, 'w') as arquivo:
-        arquivo.write(f"Este é o arquivo {nome_arquivo}")
+      # Loop para gerar 5 arquivos para cada dia
+      for i in range(1, 8):
+          # Criar o nome do arquivo com o formato desejado
+          nome_arquivo = f"arquivo_{data_atual.strftime('%Y%m%d')}_{i}.sql"
+          caminho_arquivo = os.path.join(os.getenv("FROMPATH"), nome_arquivo)
+          
+          # Criar o arquivo na pasta 'origem'
+          with open(caminho_arquivo, 'w') as arquivo:
+              arquivo.write(f"CREATE TABLE exemplo{i} (\n\tid INT,\n\tnome VARCHAR(255)\n);\n")
+          
+          # Definir a data de modificação do arquivo
+          data_modificacao = data_atual.timestamp()
+          os.utime(caminho_arquivo, times=(data_modificacao, data_modificacao))
       
-      # Definir a data de modificação do arquivo
-      data_modificacao = data_atual.timestamp()
-      os.utime(caminho_arquivo, times=(data_modificacao, data_modificacao))
-    
-    # Avançar para o próximo dia
-    data_atual += delta_dias
-    
+      # Avançar para o próximo dia
+      data_atual += delta_dias
+           
 def convertBytesTo(bytes):
 
   kb = bytes / 1024
@@ -87,7 +79,7 @@ def getFilesToMove(directory):
 
   for file in files:
 
-    if(file.endswith('txt')):
+    if(file.endswith('sql')):
 
       filePath = os.path.join(directory, file)
       fileDate = datetime.fromtimestamp(os.stat(filePath).st_mtime)
@@ -175,25 +167,24 @@ def transferFiles(files, fromPath, toPath, buffer):
       
     logging.info(f"\n{response_log}")
     
-    rmtree("buffer")
-    rmtree("destino")
-    rmtree("origem")
-    
 def boot(fromPath, toPath, buffer):
 
   #EXECUTA O BACKUP APENAS NAS SEGUNDAS
-  currDate = date.today()
-  #if(currDate.weekday() != 0):
-    #return
+  #currDate = date.today()
+  currDate = datetime(2024, 2, 26) #simulando que hoje é segunda
+  if(currDate.weekday() != 0):
+    return
 
   try:
       
     #VERIFICANDO SE OS CAMINHOS EXISTEM E SÃO PASTAS
     for path in [fromPath, toPath, buffer]:
       if not os.path.exists(path):
-        raise FileNotFoundError(f'O caminho ({path}) não existe!')
+        raise FileNotFoundError(f'O caminho ({path}) nao existe!')
       if not os.path.isdir(path):
-        raise NotADirectoryError(f'O caminho ({path}) não é um diretório!')
+        raise NotADirectoryError(f'O caminho ({path}) nao é um diretório!')
+      
+    createTestDirectory()
 
     #INFORMAÇÕES DOS DIRETÓRIOS
     toPathInfo = getStorageInfo(toPath)
@@ -203,9 +194,9 @@ def boot(fromPath, toPath, buffer):
 
     #VERIFICANDO SE EXISTE ARMAZENAMENTO DISPONIVEL
     if(filesToMove['totalSize'] > toPathInfo['free']):
-      raise Exception(f"O diretório ({toPath}) não possui espaço suficiente!")
+      raise Exception(f"O diretório ({toPath}) nao possui espaço suficiente!")
     elif(filesToMove['totalSize'] > bufferInfo['free']):
-      raise Exception(f"O diretório ({buffer}) não possui espaço suficiente!")
+      raise Exception(f"O diretório ({buffer}) nao possui espaço suficiente!")
 
     #COPIANDO E MOVENDO ARQUIVOS
     transferFiles(filesToMove['files'], fromPath, toPath, buffer)
@@ -216,10 +207,8 @@ def boot(fromPath, toPath, buffer):
 with open('teste_script_backup.log', 'w') as log_file:
   log_file.write('')
 
+logging.info(f"Data ficticia atual: 26/02/2024\nIntervalo das datas dos arquivos de teste: 18/02/2024 | 26/02/2024\n")
 logging.info(f"Caminhos\nfrompath: {os.getenv("FROMPATH")}\ntopath: {os.getenv("TOPATH")}\nbuffer: {os.getenv("BUFFER")}\n")
 logging.info(f"Credenciais\nfrom_email: {os.getenv("FROM_EMAIL")}\nto_email: {os.getenv("TO_EMAIL")}\n")
-
-createTestDirectory()
-
 
 boot(os.getenv("FROMPATH"), os.getenv("TOPATH"), os.getenv("BUFFER"))
